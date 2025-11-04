@@ -60,6 +60,88 @@ In this experiment:
 ---
 
 ## SystemVerilog Code
+```
+module i2c_master (
+    output logic SDA,
+    output logic SCL,
+    input  logic CLK,
+    input  logic RESET
+);
+
+    logic [7:0] data = 8'hA5;
+    int i;
+
+    always @(posedge CLK or posedge RESET) begin
+        if (RESET) begin
+            SDA <= 1;
+            SCL <= 1;
+        end else begin
+            SDA <= 0;
+            #5;
+            for (i = 7; i >= 0; i--) begin
+                SCL <= 0;
+                SDA <= data[i];
+                #5;
+                SCL <= 1;
+                #5;
+            end
+            SCL <= 1;
+            SDA <= 1;
+        end
+    end
+endmodule
+module i2c_tb;
+    logic SDA, SCL;
+    logic CLK, RESET;
+
+    i2c_master uut (
+        .SDA(SDA),
+        .SCL(SCL),
+        .CLK(CLK),
+        .RESET(RESET)
+    );
+
+    initial begin
+        CLK = 0;
+        forever #5 CLK = ~CLK;
+    end
+
+    initial begin
+        RESET = 1;
+        #10 RESET = 0;
+    end
+
+    property start_condition;
+        @(posedge CLK) (SCL && $fell(SDA));
+    endproperty
+    start_check: assert property (start_condition)
+        $display("START condition detected at time %0t", $time);
+    else
+        $error("START condition violated at time %0t", $time);
+
+    property stop_condition;
+        @(posedge CLK) (SCL && $rose(SDA));
+    endproperty
+    stop_check: assert property (stop_condition)
+        $display("STOP condition detected at time %0t", $time);
+    else
+        $error("STOP condition violated at time %0t", $time);
+
+    property data_stable;
+        @(posedge SCL) $stable(SDA);
+    endproperty
+    stable_check: assert property (data_stable)
+        $display("SDA stable during SCL HIGH at time %0t", $time);
+    else
+        $error("Data changed during clock high (I2C violation) at time %0t", $time);
+
+    initial begin
+        #200;
+        $display("\n=== Simulation Completed ===");
+        $finish;
+    end
+endmodule
+```
 
 ### I²C Master Design 
 ```systemverilog
@@ -151,8 +233,10 @@ module i2c_tb;
 endmodule
 ```
 ### Simulation Output
+<img width="1920" height="1080" alt="Screenshot 2025-11-04 154952" src="https://github.com/user-attachments/assets/37c86a44-38d4-47f9-bbc3-e52acf82c68f" />
+<img width="1920" height="1080" alt="Screenshot 2025-11-04 155006" src="https://github.com/user-attachments/assets/c719a4a8-5caf-4b7a-84d4-cb8931bba4d0" />
+<img width="1920" height="1080" alt="Screenshot 2025-11-04 155031" src="https://github.com/user-attachments/assets/be04b5b5-1404-4eee-9c6f-1633bb566232" />
 
------ Paste the output
 
 ### Result
 The Assertion-Based Verification of the I²C protocol timing and handshaking sequences was successfully carried out using SystemVerilog.Assertions effectively verified setup, hold, start, and stop conditions, ensuring reliable communication as per the I²C protocol specification.
